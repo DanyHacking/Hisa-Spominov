@@ -144,6 +144,8 @@ const Core = (function() {
             nextButton: document.getElementById('next-page'),
             pageIndicator: document.getElementById('page-indicator'),
             loading: document.getElementById('loading'),
+            resumeOverlay: document.getElementById('resume-overlay'),
+            resumePageNum: document.getElementById('resume-page-num'),
             backToCover: document.getElementById('back-to-cover'),
             toggleToc: document.getElementById('toggle-toc'),
             toggleNightMode: document.getElementById('toggle-night-mode'),
@@ -569,13 +571,62 @@ const Navigation = (function() {
     const velocityThreshold = 0.3;
     let gestureInProgress = false;
     let cancelGesture = false;
-
+    let uiHideTimeout = null;
+    const UI_HIDE_DELAY = 3000;
+    
     function setupAll() {
         setupKeyboard();
         setupTouch();
         setupClickZones();
+        setupAutoHideUI();
     }
-
+    
+    function setupAutoHideUI() {
+        const toolbar = Core.elements.flipbookContainer.querySelector('.toolbar');
+        
+        function showUI() {
+            if (toolbar) toolbar.classList.remove('hidden-ui');
+            resetUITimer();
+        }
+        
+        function hideUI() {
+            if (toolbar) toolbar.classList.add('hidden-ui');
+        }
+        
+        function resetUITimer() {
+            if (uiHideTimeout) clearTimeout(uiHideTimeout);
+            uiHideTimeout = setTimeout(hideUI, UI_HIDE_DELAY);
+        }
+        
+        document.addEventListener('mousemove', function() {
+            if (!Core.elements.flipbookContainer.classList.contains('hidden')) showUI();
+        }, { passive: true });
+        
+        document.addEventListener('touchstart', function() {
+            if (!Core.elements.flipbookContainer.classList.contains('hidden')) showUI();
+        }, { passive: true });
+        
+        document.addEventListener('keydown', function() {
+            if (!Core.elements.flipbookContainer.classList.contains('hidden')) showUI();
+        });
+        
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.attributeName === 'class') {
+                    var isVisible = !Core.elements.flipbookContainer.classList.contains('hidden');
+                    if (isVisible) {
+                        resetUITimer();
+                    } else {
+                        if (uiHideTimeout) clearTimeout(uiHideTimeout);
+                        if (toolbar) toolbar.classList.remove('hidden-ui');
+                    }
+                }
+            });
+        });
+        
+        observer.observe(Core.elements.flipbookContainer, { attributes: true });
+    }
+    
     function setupKeyboard() {
         document.addEventListener('keydown', function(e) {
             if (Core.elements.flipbookContainer.classList.contains('hidden')) return;
@@ -721,11 +772,11 @@ const UI = (function() {
         
         Core.elements.pageIndicator.textContent = current + ' / ' + total;
         
-        // Update progress if element exists
+        // Update progress with transform for performance
         const progressEl = document.getElementById('reading-progress');
         if (progressEl) {
-            const percent = Math.round((current / total) * 100);
-            progressEl.style.width = percent + '%';
+            const progress = current / total;
+            progressEl.style.transform = 'scaleX(' + progress + ')';
         }
         
         // Update remaining
@@ -878,7 +929,35 @@ const UI = (function() {
             Core.elements.toggleFullscreen.classList.toggle('active', Core.state.isFullscreen);
         }
     }
-
+    
+    function showResumeOverlay(savedPage) {
+        if (!Core.elements.resumeOverlay || !Core.elements.resumePageNum) return;
+        
+        Core.elements.resumePageNum.textContent = savedPage;
+        Core.elements.resumeOverlay.classList.remove('hidden');
+        
+        // Continue button
+        var continueBtn = document.getElementById('resume-continue');
+        var startBtn = document.getElementById('resume-start');
+        
+        if (continueBtn) {
+            continueBtn.onclick = function() {
+                Core.elements.resumeOverlay.classList.add('hidden');
+                Core.state.currentPage = savedPage;
+                Render.gotoPage(savedPage);
+            };
+        }
+        
+        if (startBtn) {
+            startBtn.onclick = function() {
+                Core.elements.resumeOverlay.classList.add('hidden');
+                Core.state.currentPage = 1;
+                localStorage.setItem('lastReadPage', '1');
+                Render.gotoPage(1);
+            };
+        }
+    }
+    
     function showToc() {
         Core.elements.tocOverlay.classList.remove('hidden');
         Core.elements.bookmarksOverlay.classList.add('hidden');
@@ -1265,10 +1344,8 @@ const flipbook = {
         
         UI.initSavedSettings();
         
-        // Restore last read page
-        if (Core.state.lastReadPage > 1 && Core.state.lastReadPage <= Core.state.totalPages) {
-            Core.state.currentPage = Core.state.lastReadPage;
-        }
+        // Show resume overlay if there's a saved page
+        var hasSavedPage = Core.state.lastReadPage > 1 && Core.state.lastReadPage <= Core.state.totalPages;
         
         await Render.renderAllPages();
         
@@ -1282,7 +1359,15 @@ const flipbook = {
         UI.updatePageIndicator();
         UI.updateBookmarkButton();
         
-        Performance.startMonitoring();
+        // Show resume overlay if applicable
+        if (hasSavedPage) {
+            showResumeOverlay(Core.state.lastReadPage);
+        }
+        
+        // Start performance monitoring after first page load (lazy init)
+        setTimeout(function() {
+            Performance.startMonitoring();
+        }, 1000);
         
         // Setup orientation change handling
         handleOrientationChange();
@@ -1375,21 +1460,45 @@ function setupEventListeners() {
 }
 
 function handleOrientationChange() {
+    var orientationTimeout = null;
+    var resizeTimeout = null;
+    
     window.addEventListener('orientationchange', function() {
-        setTimeout(function() {
+        // Debounce 200ms
+        if (orientationTimeout) clearTimeout(orientationTimeout);
+        
+        orientationTimeout = setTimeout(function() {
+            // Recalculate viewport
+            Core.DeviceDetector.init();
+            
+            // Update pageFlip if exists
             if (Core.state.pageFlip) {
                 Core.state.pageFlip.update();
             }
+            
+            // For simple mode, re-render current page
+            if (Core.state.isSimpleMode) {
+                Render.gotoPage(Core.state.currentPage);
+            }
+            
             window.scrollTo(0, 0);
-        }, 100);
+        }, 200);
     });
     
     // Also handle resize for orientation
     window.addEventListener('resize', function() {
-        if (window.orientation !== undefined) {
-            Core.DeviceDetector.init();
-            Memory.setMaxCacheSize(Core.CONFIG.renderMode.maxRenderedPages);
-        }
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        
+        resizeTimeout = setTimeout(function() {
+            if (window.orientation !== undefined) {
+                Core.DeviceDetector.init();
+                Memory.setMaxCacheSize(Core.CONFIG.renderMode.maxRenderedPages);
+                
+                if (Core.state.pageFlip) {
+                    Core.state.pageFlip.update();
+                }
+            }
+        }, 200);
     });
 }
 
