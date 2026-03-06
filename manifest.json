@@ -1,0 +1,25 @@
+{
+    "name": "Hiša spominov",
+    "short_name": "Hiša spominov",
+    "description": "Hiša spominov - Ko dnevniki spregovorijo",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#F5F1EB",
+    "theme_color": "#8B4513",
+    "orientation": "any",
+    "scope": "/",
+    "icons": [
+        {
+            "src": "sredstva/naslovnica.jpg",
+            "sizes": "192x192",
+            "type": "image/jpeg"
+        },
+        {
+            "src": "sredstva/naslovnica.jpg",
+            "sizes": "512x512",
+            "type": "image/jpeg"
+        }
+    ],
+    "categories": ["books", "reading"],
+    "lang": "sl"
+}
