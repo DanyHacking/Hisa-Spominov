@@ -5,7 +5,7 @@
 
 // Configuration
 const CONFIG = {
-    pdfPath: 'pdf/hisa_spominov_del1.pdf',
+    pdfPath: 'pdf/hisa_spominov_poln.pdf',
     scale: 1.5,
     zoomScale: 2.0,
     minScale: 1.0,
