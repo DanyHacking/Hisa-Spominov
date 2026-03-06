@@ -172,6 +172,13 @@ body {
     border-bottom: 1px solid var(--border-color);
     box-shadow: 0 2px 10px var(--shadow-color);
     z-index: 50;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.toolbar.hidden-ui {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
 }
 
 [data-theme="night"] .toolbar {
@@ -480,8 +487,84 @@ body {
 #reading-progress {
     height: 100%;
     background: var(--primary-color);
-    width: 0%;
-    transition: width 0.3s ease;
+    width: 100%;
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 0.2s linear;
+}
+
+/* Resume overlay */
+.resume-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.resume-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.resume-content {
+    background: white;
+    padding: 2rem 3rem;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    max-width: 90%;
+}
+
+[data-theme="night"] .resume-content {
+    background: #2a2a2a;
+    color: #e0e0e0;
+}
+
+.resume-content p {
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+.resume-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.resume-btn {
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.resume-btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.resume-btn.primary:hover {
+    background: #6d3610;
+}
+
+.resume-btn.secondary {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.resume-btn.secondary:hover {
+    background: rgba(0, 0, 0, 0.05);
 }
 
 #pages-remaining {
@@ -510,10 +593,12 @@ body {
     max-width: 100%;
     max-height: 100%;
     transition: opacity 0.15s ease;
+    opacity: 1;
 }
 
 .page.simple-page.transitioning {
     opacity: 0.5;
+    transition: opacity 0.15s ease;
 }
 
 .page-image {
